@@ -1,0 +1,70 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*' # 当推送以 v 开头的 tag 时触发，如 v1.0.0
+
+jobs:
+  build:
+    name: Build for ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            artifact_name: splog-win.zip
+            platform: windows
+          - os: ubuntu-latest
+            artifact_name: splog-linux.tar.gz
+            platform: linux
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 1. 项目编译阶段 (根据你的实际编译指令修改，此处以 cmake 为例)
+      - name: Compile Project (Windows 32-bit)
+        if: matrix.platform == 'windows'
+        run: |
+          # 如果是 C++ 项目，指定生成 32 位架构
+          cmake -A Win32 -B build
+          cmake --build build --config Release
+
+      - name: Compile Project (Linux)
+        if: matrix.platform == 'linux'
+        run: |
+          cmake -B build
+          cmake --build build --config Release
+
+      # 2. 创建目录结构并拷贝文件
+      - name: Prepare Artifacts
+        shell: bash
+        run: |
+          # 创建目录结构
+          mkdir -p splog/include
+          
+          # 拷贝编译生成的 lib 文件 (假设在 build/lib 或根据实际路径修改)
+          # Windows 通常是 .lib/.dll，Linux 是 .a/.so
+          cp -r ./build/lib* ./splog/ || cp ./build/Release/lib* ./splog/ || true
+          
+          # 拷贝头文件
+          cp splog.h ./splog/include/
+
+      # 3. 打包文件夹
+      - name: Archive Package (Windows)
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: Compress-Archive -Path splog -DestinationPath ${{ matrix.artifact_name }}
+
+      - name: Archive Package (Linux)
+        if: matrix.platform == 'linux'
+        run: tar -czvf ${{ matrix.artifact_name }} splog
+
+      # 4. 上传到 GitHub Release
+      - name: Upload Release Asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ matrix.artifact_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
