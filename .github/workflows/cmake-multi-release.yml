@@ -1,0 +1,65 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build for ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            artifact_name: splog-win.zip
+            platform: windows
+          - os: ubuntu-latest
+            artifact_name: splog-linux.tar.gz
+            platform: linux
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 1. Windows 编译、文件整理与打包
+      - name: Build and Pack (Windows)
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          # 编译
+          cmake -A Win32 -B build
+          cmake --build build --config Release
+          # 整理目录
+          New-Item -ItemType Directory -Force -Path "splog/include", "splog/lib"
+          Copy-Item "build/Release/*.lib" -Destination "splog/lib/" -ErrorAction SilentlyContinue
+          Copy-Item "build/Release/*.dll" -Destination "splog/lib/" -ErrorAction SilentlyContinue
+          Copy-Item "splog.h" -Destination "splog/include/"
+          # 打包
+          Compress-Archive -Path splog -DestinationPath ${{ matrix.artifact_name }}
+
+      # 2. Linux 编译、文件整理与打包
+      - name: Build and Pack (Linux)
+        if: matrix.platform == 'linux'
+        run: |
+          # 编译
+          cmake -B build
+          cmake --build build --config Release
+          # 整理目录
+          mkdir -p splog/include splog/lib
+          cp build/*.so splog/lib/ || true
+          cp splog.h splog/include/
+          # 打包
+          tar -czvf ${{ matrix.artifact_name }} splog
+
+      # 3. 上传到 GitHub Release
+      - name: Upload Release Asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ matrix.artifact_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
