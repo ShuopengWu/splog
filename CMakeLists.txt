@@ -26,3 +26,11 @@ target_include_directories(splog PUBLIC ${CMAKE_CURRENT_SOURCE_STRING})
 
 add_executable(text main.cpp)
 target_link_libraries(text PRIVATE splog)
+
+install(TARGETS splog
+    RUNTIME DESTINATION bin
+    LIBRARY DESTINATION lib
+    ARCHIVE DESTINATION lib
+)
+
+install(FILES splog.h DESTINATION include)
