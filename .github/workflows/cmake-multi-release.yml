@@ -26,33 +26,23 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 1. Windows 编译、文件整理与打包
-      - name: Build and Pack (Windows)
+      - name: Build and Install (Windows)
         if: matrix.platform == 'windows'
-        shell: pwsh
         run: |
-          # 编译
           cmake -A Win32 -B build
           cmake --build build --config Release
-          # 整理目录
-          New-Item -ItemType Directory -Force -Path "splog/include", "splog/lib"
-          Copy-Item "build/Release/*.lib" -Destination "splog/lib/" -ErrorAction SilentlyContinue
-          Copy-Item "build/Release/*.dll" -Destination "splog/lib/" -ErrorAction SilentlyContinue
-          Copy-Item "splog.h" -Destination "splog/include/"
+          # 核心命令：将所有产物安装到 ./splog 文件夹
+          cmake --install build --prefix ./splog --config Release
           # 打包
           Compress-Archive -Path splog -DestinationPath ${{ matrix.artifact_name }}
 
-      # 2. Linux 编译、文件整理与打包
-      - name: Build and Pack (Linux)
+      - name: Build and Install (Linux)
         if: matrix.platform == 'linux'
         run: |
-          # 编译
-          cmake -B build
-          cmake --build build --config Release
-          # 整理目录
-          mkdir -p splog/include splog/lib
-          cp build/*.so splog/lib/ || true
-          cp splog.h splog/include/
+          cmake -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build
+          # 核心命令：安装到 ./splog
+          cmake --install build --prefix ./splog
           # 打包
           tar -czvf ${{ matrix.artifact_name }} splog
 
