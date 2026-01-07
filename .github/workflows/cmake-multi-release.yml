@@ -15,11 +15,11 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: windows-latest
+          - os: windows-2019
             artifact_name: splog-win-x64.zip
             platform: windows
             arch: x64 # 新增 x64 配置
-          - os: windows-latest
+          - os: windows-2019
             artifact_name: splog-win-x86.zip
             platform: windows
             arch: Win32 # 新增 Win32 配置
