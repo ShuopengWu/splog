@@ -10,60 +10,55 @@ splog::Log &splog::Log::instance()
 
 void splog::Log::set_sync_model(LogSyncMode mode)
 {
-    pimpl->configation.mode = mode;
+    pimpl->configuration.mode = mode;
     if (!pimpl->first_apply)
-        pimpl->apply_configation(LogConfigationFlag::mode);
+        pimpl->apply_configuration(LogConfigurationFlag::mode);
 }
 
 void splog::Log::set_output_target(LogOutputTarget target)
 {
-    pimpl->target = target;
+    pimpl->configuration.target = target;
     if (!pimpl->first_apply)
-        pimpl->apply_configation(LogConfigationFlag::target);
+        pimpl->apply_configuration(LogConfigurationFlag::target);
 }
 
 void splog::Log::set_filename(const std::string &filename)
 {
-    pimpl->configation.filename = filename;
+    pimpl->configuration.filename = filename;
     if (!pimpl->first_apply)
-        pimpl->apply_configation(LogConfigationFlag::filename);
+        pimpl->apply_configuration(LogConfigurationFlag::filename);
 }
 
 void splog::Log::set_flush_threshold(int flush_threshold)
 {
-    pimpl->configation.flush_threshold = flush_threshold;
+    pimpl->configuration.flush_threshold = flush_threshold;
     if (!pimpl->first_apply)
-        pimpl->apply_configation(LogConfigationFlag::flush_threshold);
+        pimpl->apply_configuration(LogConfigurationFlag::flush_threshold);
 }
 
 void splog::Log::set_max_level(LogLevel l)
 {
-    pimpl->configation.max_level = l;
+    pimpl->configuration.max_level = l;
     if (!pimpl->first_apply)
-        pimpl->apply_configation(LogConfigationFlag::max_level);
+        pimpl->apply_configuration(LogConfigurationFlag::max_level);
 }
 
 void splog::Log::add_log(const std::string &log, LogFuctionBuilder function, LogLevel l, const std::string &separator)
 {
     if (pimpl->first_apply)
     {
-        pimpl->apply_configation(LogConfigationFlag::all);
+        pimpl->apply_configuration(LogConfigurationFlag::all);
         pimpl->first_apply = false;
     }
 
     pimpl->client->add_log(log, l, separator, function.func);
-    if (pimpl->target & LogOutputTarget::File)
-    {
-        if (!pimpl->server)
-            std::cerr << "Please set the mode." << std::endl;
-    }
 }
 
 void splog::Log::add_log(std::initializer_list<LogParameter> log, LogFuctionBuilder function, LogLevel l, const std::string &separator)
 {
     if (pimpl->first_apply)
     {
-        pimpl->apply_configation(LogConfigationFlag::all);
+        pimpl->apply_configuration(LogConfigurationFlag::all);
         pimpl->first_apply = false;
     }
 

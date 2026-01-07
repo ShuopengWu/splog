@@ -106,17 +106,17 @@ private:
     std::thread worker;
 };
 
-struct LogConfigation
+struct LogConfiguration
 {
     LogSyncMode mode;
     LogOutputTarget target;
     int flush_threshold;
     std::string filename;
     LogLevel max_level;
-    LogConfigation();
+    LogConfiguration();
 };
 
-enum LogConfigationFlag
+enum LogConfigurationFlag
 {
     mode                = 0b000001,
     target              = 0b000010,
@@ -129,10 +129,9 @@ enum LogConfigationFlag
 class Log::LogImpl
 {
 public:
-    void apply_configation(LogConfigationFlag flag);
+    void apply_configuration(LogConfigurationFlag flag);
     bool first_apply = true;
-    LogConfigation configation;
-    LogOutputTarget target;
+    LogConfiguration configuration;
     std::unique_ptr<LogClient> client;
     std::unique_ptr<LogServer> server;
 };

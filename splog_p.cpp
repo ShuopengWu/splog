@@ -383,7 +383,7 @@ void splog::AsyncLogServer::set_flush_threshold(int flush_threshold)
     this->max_threshold = MAGNIFICATION * flush_threshold;
 }
 
-splog::LogConfigation::LogConfigation()
+splog::LogConfiguration::LogConfiguration()
 {
     mode = LogSyncMode::Sync;
     target = LogOutputTarget::Console;
@@ -392,13 +392,13 @@ splog::LogConfigation::LogConfigation()
     max_level = LogLevel::Warning;
 }
 
-void splog::Log::LogImpl::apply_configation(LogConfigationFlag flag)
+void splog::Log::LogImpl::apply_configuration(LogConfigurationFlag flag)
 {
-    if (flag & LogConfigationFlag::mode)
+    if (flag & LogConfigurationFlag::mode)
     {
         if (!server)
         {
-            if (configation.mode == LogSyncMode::Sync)
+            if (configuration.mode == LogSyncMode::Sync)
                 server = std::make_unique<SyncLogServer>();
             else
                 server = std::make_unique<AsyncLogServer>();
@@ -411,29 +411,29 @@ void splog::Log::LogImpl::apply_configation(LogConfigationFlag flag)
         // The mode switching function will be implemented later.
     }
 
-    if (flag & LogConfigationFlag::target)
+    if (flag & LogConfigurationFlag::target)
     {
-        client->set_target(target);
+        client->set_target(configuration.target);
     }
 
-    if (flag & LogConfigationFlag::filename)
+    if (flag & LogConfigurationFlag::filename)
     {
         if (server)
-            server->set_file_name(configation.filename);
+            server->set_file_name(configuration.filename);
     }
 
-    if (flag & LogConfigationFlag::flush_threshold)
+    if (flag & LogConfigurationFlag::flush_threshold)
     {
         if (server)
         {
             auto *async_server = dynamic_cast<AsyncLogServer *>(server.get());
             if (async_server)
-                async_server->set_flush_threshold(flush_threshold);
+                async_server->set_flush_threshold(configuration.flush_threshold);
         }
     }
 
-    if (flag & LogConfigationFlag::max_level)
+    if (flag & LogConfigurationFlag::max_level)
     {
-        client->set_max_level(configation.max_level);
+        client->set_max_level(configuration.max_level);
     }
 }

@@ -22,12 +22,12 @@ int main()
         splog::logger.set_sync_model(splog::LogSyncMode::Async);
         splog::logger.set_output_target(splog::LogOutputTarget::All);
         splog::logger.set_filename("1.log");
-        splog::logger.set_flush_threshold(1);
+        splog::logger.set_flush_threshold(100);
         splog::logger.set_max_level(splog::LogLevel::Warning);
     }
     app::A a;
     std::string s;
 
-    for (int i = 0; i < 100000; i++)
+    for (int i = 0; i < 100; i++)
         a.showLog(std::to_string(i));
 }
