@@ -10,6 +10,11 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# Fixes a bug in MSVC's default report where __cplusplus is 199711L < 202002L
+if(MSVC)
+    add_compile_options(/Zc:__cplusplus)
+endif()
+
 # for gdb debug
 set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")
 
@@ -21,10 +26,14 @@ set_target_properties(splog PROPERTIES
     ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/lib"
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/lib"
 )
+set_target_properties(splog PROPERTIES CXX_STANDARD 20)
+
+target_compile_definitions(splog PRIVATE SPLOG_EXPORTS)
 
 target_include_directories(splog PUBLIC ${CMAKE_CURRENT_SOURCE_STRING})
 
 add_executable(text main.cpp)
+set_target_properties(text PROPERTIES CXX_STANDARD 20)
 target_link_libraries(text PRIVATE splog)
 
 install(TARGETS splog
