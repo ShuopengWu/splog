@@ -37,7 +37,7 @@ set_target_properties(text PROPERTIES CXX_STANDARD 20)
 target_link_libraries(text PRIVATE splog)
 
 install(TARGETS splog
-    RUNTIME DESTINATION bin
+    RUNTIME DESTINATION lib
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib
 )
