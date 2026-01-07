@@ -10,26 +10,33 @@ permissions:
 
 jobs:
   build:
-    name: Build for ${{ matrix.os }}
+    name: Build for ${{ matrix.os }} ${{ matrix.arch }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         include:
           - os: windows-latest
-            artifact_name: splog-win.zip
+            artifact_name: splog-win-x64.zip
             platform: windows
+            arch: x64 # 新增 x64 配置
+          - os: windows-latest
+            artifact_name: splog-win-x86.zip
+            platform: windows
+            arch: Win32 # 新增 Win32 配置
           - os: ubuntu-latest
             artifact_name: splog-linux.tar.gz
             platform: linux
+            arch: "" # Linux 不需要arch字段
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Build and Install (Windows)
+      - name: Build and Install (Windows ${{ matrix.arch }})
         if: matrix.platform == 'windows'
         run: |
-          cmake -A Win32 -B build
+          # 根据 matrix.arch 动态调整 CMake 架构参数 (-A)
+          cmake -A ${{ matrix.arch }} -B build
           cmake --build build --config Release
           # 核心命令：将所有产物安装到 ./splog 文件夹
           cmake --install build --prefix ./splog --config Release
