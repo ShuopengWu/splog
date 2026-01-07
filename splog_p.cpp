@@ -15,7 +15,8 @@ splog::LogElement::LogElement()
 
 std::string splog::LogElement::format()
 {
-    std::string full_content = is_show_key ? (std::string(key) + ":" + content) : content;
+    std::string core = is_show_key ? (std::string(key) + ":" + content) : content;
+    std::string full_content = prefix + core + suffix;
 
     int pad = min_width - (int)full_content.size();
 
@@ -47,6 +48,8 @@ splog::LogElement &splog::LogElement::operator =(const LogElement &element)
     this->alignment     = element.alignment;
     this->is_show_key   = element.is_show_key;
     this->key           = element.key;
+    this->prefix        = element.prefix;
+    this->suffix        = element.suffix;
 
     return *this;
 }
@@ -64,7 +67,7 @@ std::string splog::LogFormater::format()
     for (int i = 0; i < keys.size(); i++)
     {
         if (i != 0)
-            str += ' ';
+            str += separator;
         str += hash[keys[i]].format();
     }
 
@@ -107,6 +110,11 @@ splog::LogFormater &splog::LogFormater::operator +=(const LogFormater &formater)
     return *this;
 }
 
+void splog::LogFormater::set_separator(std::string_view separator)
+{
+    this->separator = separator;
+}
+
 splog::LogClient::LogClient(LogOutputTarget target) :
     target(target)
 {
@@ -117,10 +125,20 @@ void splog::LogClient::set_target(LogOutputTarget target)
     this->target = target;
 }
 
-splog::LogClient &splog::LogClient::add_log(std::string_view log, LogLevel l, const std::source_location &location)
+void splog::LogClient::set_max_level(LogLevel l)
 {
-    splog::LogFormater base = base_log(location.function_name(), l);
+    max_level = l;
+}
+
+splog::LogClient &splog::LogClient::add_log(std::string_view log, LogLevel l, std::string_view separator, std::string_view function_name)
+{
+    if (l > max_level)
+        return *this;
+
+    splog::LogFormater base = base_log(function_name, l);
     base["message"] = log;
+    base["message"].is_show_key = false;
+    base.set_separator(separator);
     std::string all_log = base.format();
     if (target & LogOutputTarget::Console)
     {
@@ -141,10 +159,14 @@ splog::LogClient &splog::LogClient::add_log(std::string_view log, LogLevel l, co
     return *this;
 }
 
-splog::LogClient &splog::LogClient::add_log(LogFormater log, LogLevel l, const std::source_location &location)
+splog::LogClient &splog::LogClient::add_log(LogFormater log, LogLevel l, std::string_view separator, std::string_view function_name)
 {
-    splog::LogFormater base = base_log(location.function_name(), l);
+    if (l > max_level)
+        return *this;
+
+    splog::LogFormater base = base_log(function_name, l);
     base += log;
+    base.set_separator(separator);
     std::string all_log = base.format();
     if (target & LogOutputTarget::Console)
     {
@@ -213,11 +235,10 @@ std::string splog::to_string(LogLevel l)
     }
 }
 
-splog::LogServer::LogServer(std::string_view filename, int flush_threshold) :
-    file(filename),
-    flush_threshold(flush_threshold)
+splog::LogServer::LogServer(std::string_view filename) :
+    file(filename)
 {
-    buffer.reserve(flush_threshold);
+    max_threshold = 1024 * 1024 * 4;
 }
 
 splog::LogServer::~LogServer()
@@ -229,14 +250,14 @@ void splog::LogServer::set_file_name(std::string_view filename)
     this->file.set_file_name(filename);
 }
 
-void splog::LogServer::set_flush_threshold(int flush_threshold)
+void splog::LogServer::set_max_threshold(int max_threshold)
 {
-    this->flush_threshold = flush_threshold;
-    this->max_threshold = 4 * flush_threshold;
+    this->max_threshold = max_threshold;
 }
 
 void splog::LogServer::full_handler()
 {
+    std::cerr << "[splog]Files and multiple write failures will trigger the cleanup of old logs to prevent excessive memory usage." << std::endl;
     std::size_t target_size = max_threshold * 0.8;
     if (buffer.size() < target_size)
         return;
@@ -265,18 +286,21 @@ void splog::SyncLogServer::flush()
     if (buffer.empty())
         return;
 
-    bool ok = file.write(buffer, file::Write_Mode::Append);
-    if (ok)
+    bool ok = false;
+
+    static constexpr int RETRY_COUNT = 3;
+    for (int i = 0; i < RETRY_COUNT; i++)
     {
-        buffer.clear();
-    }
-    else
-    {
-        if (buffer.size() > max_threshold)
+        ok = file.write(buffer, file::Write_Mode::Append);
+        if (ok)
         {
-            full_handler();
+            buffer.clear();
+            return;
         }
     }
+
+    if (buffer.size() > max_threshold)
+        full_handler();
 }
 
 void splog::SyncLogServer::sink(std::string &&data)
@@ -284,12 +308,11 @@ void splog::SyncLogServer::sink(std::string &&data)
     if (data.empty())
         return;
     buffer.append(data);
-    if (buffer.size() >= flush_threshold)
-        flush();
+    flush();
 }
 
 splog::AsyncLogServer::AsyncLogServer(std::string_view filename, int flush_threshold)
-    : LogServer(filename, flush_threshold),
+    : LogServer(filename),
     is_stop(false)
 {
     worker = std::thread([this]{
@@ -350,5 +373,67 @@ void splog::AsyncLogServer::sink(std::string &&data)
 
         if (buffer.size() > max_threshold)
             cv.notify_one();
+    }
+}
+
+void splog::AsyncLogServer::set_flush_threshold(int flush_threshold)
+{
+    this->flush_threshold = flush_threshold;
+    static constexpr int MAGNIFICATION = 4;
+    this->max_threshold = MAGNIFICATION * flush_threshold;
+}
+
+splog::LogConfigation::LogConfigation()
+{
+    mode = LogSyncMode::Sync;
+    target = LogOutputTarget::Console;
+    flush_threshold = 1;
+    filename = "";
+    max_level = LogLevel::Warning;
+}
+
+void splog::Log::LogImpl::apply_configation(LogConfigationFlag flag)
+{
+    if (flag & LogConfigationFlag::mode)
+    {
+        if (!server)
+        {
+            if (configation.mode == LogSyncMode::Sync)
+                server = std::make_unique<SyncLogServer>();
+            else
+                server = std::make_unique<AsyncLogServer>();
+
+            client->set_handler([this](std::string data){
+                server->sink(std::move(data));
+            });
+        }
+
+        // The mode switching function will be implemented later.
+    }
+
+    if (flag & LogConfigationFlag::target)
+    {
+        client->set_target(target);
+    }
+
+    if (flag & LogConfigationFlag::filename)
+    {
+        if (server)
+            server->set_file_name(configation.filename);
+    }
+
+    if (flag & LogConfigationFlag::flush_threshold)
+    {
+        if (server)
+        {
+            auto *async_server = dynamic_cast<AsyncLogServer *>(server.get());
+            if (async_server)
+                async_server->set_flush_threshold(flush_threshold);
+        }
+    }
+
+    if (flag & LogConfigationFlag::max_level)
+    {
+        client->set_max_level(configation.max_level);
     }
 }

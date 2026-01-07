@@ -2,7 +2,6 @@
 #define SPLOG_P_H
 
 #include <string>
-#include <source_location>
 #include <unordered_map>
 #include <vector>
 #include <memory>
@@ -14,13 +13,6 @@
 namespace splog
 {
 
-enum class Alignment
-{
-    Left,
-    Right,
-    Center
-};
-
 std::string to_string(LogLevel l);
 
 struct LogElement
@@ -29,6 +21,8 @@ struct LogElement
     int min_width = 0;
     Alignment alignment = Alignment::Left;
     bool is_show_key = true;
+    std::string prefix;
+    std::string suffix;
     explicit LogElement(std::string_view key);
     explicit LogElement();
     std::string format();
@@ -45,7 +39,9 @@ public:
     std::string to_string();
     LogElement &operator [](std::string_view key);
     LogFormater &operator +=(const LogFormater &formater);
+    void set_separator(std::string_view separator);
 private:
+    std::string separator;
     std::vector<std::string> keys;
     std::unordered_map<std::string, LogElement> hash;
 };
@@ -56,13 +52,15 @@ class LogClient
 public:
     LogClient(LogOutputTarget target = LogOutputTarget::Console);
     void set_target(LogOutputTarget target);
-    LogClient &add_log(std::string_view log, LogLevel l = LogLevel::Info, const std::source_location &location = std::source_location::current());
-    LogClient &add_log(LogFormater log, LogLevel l = LogLevel::Info, const std::source_location &location = std::source_location::current());
+    void set_max_level(LogLevel l);
+    LogClient &add_log(std::string_view log, LogLevel l = LogLevel::Info, std::string_view separator = " ", std::string_view function_name = "");
+    LogClient &add_log(LogFormater log, LogLevel l = LogLevel::Info, std::string_view separator = " ", std::string_view function_name = "");
     void set_handler(SinkHandler handler);
 private:
     std::string extract_buffer();
     splog::LogFormater base_log(std::string_view function, LogLevel l);
     void show_to_console(std::string_view log);
+    LogLevel max_level;
     std::string buffer;
     LogOutputTarget target;
     SinkHandler handler;
@@ -71,17 +69,16 @@ private:
 class LogServer
 {
 public:
-    LogServer(std::string_view filename = "", int flush_threshold = 1024 * 1024);
+    LogServer(std::string_view filename = "");
     virtual ~LogServer();
     void set_file_name(std::string_view filename);
-    void set_flush_threshold(int flush_threshold);
+    void set_max_threshold(int max_threshold);
     virtual void flush() = 0;
     virtual void sink(std::string &&data) = 0;
 protected:
+    int max_threshold;
     virtual void full_handler();
     file::File file;
-    int flush_threshold;
-    int max_threshold;
     std::string buffer;
 };
 
@@ -100,16 +97,41 @@ public:
     ~AsyncLogServer();
     void flush();
     void sink(std::string &&data);
+    void set_flush_threshold(int flush_threshold);
 private:
+    int flush_threshold;
     std::atomic_bool is_stop;
     std::condition_variable cv;
     std::mutex mutex;
     std::thread worker;
 };
 
+struct LogConfigation
+{
+    LogSyncMode mode;
+    LogOutputTarget target;
+    int flush_threshold;
+    std::string filename;
+    LogLevel max_level;
+    LogConfigation();
+};
+
+enum LogConfigationFlag
+{
+    mode                = 0b000001,
+    target              = 0b000010,
+    flush_threshold     = 0b000100,
+    filename            = 0b001000,
+    max_level           = 0b010000,
+    all                 = mode | target | flush_threshold | filename | max_level
+};
+
 class Log::LogImpl
 {
 public:
+    void apply_configation(LogConfigationFlag flag);
+    bool first_apply = true;
+    LogConfigation configation;
     LogOutputTarget target;
     std::unique_ptr<LogClient> client;
     std::unique_ptr<LogServer> server;

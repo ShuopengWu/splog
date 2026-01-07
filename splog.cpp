@@ -10,48 +10,48 @@ splog::Log &splog::Log::instance()
 
 void splog::Log::set_sync_model(LogSyncMode mode)
 {
-    if (mode == LogSyncMode::Sync)
-        pimpl->server = std::make_unique<SyncLogServer>();
-    else
-        pimpl->server = std::make_unique<AsyncLogServer>();
-
-    pimpl->client->set_handler([this](std::string data) {
-        pimpl->server->sink(std::move(data));
-    });
+    pimpl->configation.mode = mode;
+    if (!pimpl->first_apply)
+        pimpl->apply_configation(LogConfigationFlag::mode);
 }
 
 void splog::Log::set_output_target(LogOutputTarget target)
 {
     pimpl->target = target;
-    pimpl->client->set_target(target);
+    if (!pimpl->first_apply)
+        pimpl->apply_configation(LogConfigationFlag::target);
 }
 
-void splog::Log::set_filename(std::string_view filename)
+void splog::Log::set_filename(const std::string &filename)
 {
-    if (pimpl->target & LogOutputTarget::File)
-    {
-        if (pimpl->server)
-            pimpl->server->set_file_name(filename);
-        else
-            std::cerr << "Please set the mode." << std::endl;
-    }
-    else
-    {
-        std::cerr << "Please enable file output before filename settings." << std::endl;
-    }
+    pimpl->configation.filename = filename;
+    if (!pimpl->first_apply)
+        pimpl->apply_configation(LogConfigationFlag::filename);
 }
 
 void splog::Log::set_flush_threshold(int flush_threshold)
 {
-    if (pimpl->server)
-        pimpl->server->set_flush_threshold(flush_threshold);
-    else
-        std::cerr << "Please set the mode." << std::endl;
+    pimpl->configation.flush_threshold = flush_threshold;
+    if (!pimpl->first_apply)
+        pimpl->apply_configation(LogConfigationFlag::flush_threshold);
 }
 
-void splog::Log::add_log(std::string_view log, LogLevel l, const std::source_location &location)
+void splog::Log::set_max_level(LogLevel l)
 {
-    pimpl->client->add_log(log, l, location);
+    pimpl->configation.max_level = l;
+    if (!pimpl->first_apply)
+        pimpl->apply_configation(LogConfigationFlag::max_level);
+}
+
+void splog::Log::add_log(const std::string &log, LogFuctionBuilder function, LogLevel l, const std::string &separator)
+{
+    if (pimpl->first_apply)
+    {
+        pimpl->apply_configation(LogConfigationFlag::all);
+        pimpl->first_apply = false;
+    }
+
+    pimpl->client->add_log(log, l, separator, function.func);
     if (pimpl->target & LogOutputTarget::File)
     {
         if (!pimpl->server)
@@ -59,16 +59,27 @@ void splog::Log::add_log(std::string_view log, LogLevel l, const std::source_loc
     }
 }
 
-// void splog::Log::add_log(LogFormater log, LogLevel l, const std::source_location &location)
-// {
-//     client->add_log(log, l, location);
-//     if (target & LogOutputTarget::File)
-//     {
-//         if (!server)
-//             std::cerr << "Please set the mode." << std::endl;
+void splog::Log::add_log(std::initializer_list<LogParameter> log, LogFuctionBuilder function, LogLevel l, const std::string &separator)
+{
+    if (pimpl->first_apply)
+    {
+        pimpl->apply_configation(LogConfigationFlag::all);
+        pimpl->first_apply = false;
+    }
 
-//     }
-// }
+    LogFormater f;
+    for (const auto &l : log)
+    {
+        f[l.key] = l.value;
+        f[l.key].min_width = l.width;
+        f[l.key].alignment = l.align;
+        f[l.key].is_show_key = l.is_show_key;
+        f[l.key].prefix = l.prefix;
+        f[l.key].suffix = l.suffix;
+    }
+
+    pimpl->client->add_log(f, l, separator, function.func);
+}
 
 splog::Log::Log()
 {
