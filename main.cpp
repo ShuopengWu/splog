@@ -33,6 +33,3 @@ int main()
     for (int i = 0; i < 100; i++)
         a.showLog(std::to_string(i));
 }
-
-
-
