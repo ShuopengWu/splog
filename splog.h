@@ -84,8 +84,6 @@ private:
     LogImpl *pimpl;
 };
 
-static Log &logger = Log::instance();
-
 }
 
 #endif // SPLOG_H
