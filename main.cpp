@@ -1,7 +1,7 @@
 #include "splog.h"
 #include <string>
 
-static splog::Log& logger = splog::Log::instance(); 
+static splog::Log& logger = splog::Log::instance();
 
 namespace app {
 class A{
@@ -33,6 +33,4 @@ int main()
     for (int i = 0; i < 100; i++)
         a.showLog(std::to_string(i));
 }
-
-
 
